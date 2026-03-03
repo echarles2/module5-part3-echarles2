@@ -1,0 +1,55 @@
+
+services:
+
+  mongo:
+    image: mongo:6
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # Remove host port mapping since we'll access through Nginx
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/bank_app
+      - SECRET_KEY=supersecretkey
+    depends_on:
+      - mongo
+
+  transactions:
+    build: ./transactions
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - PORT=3000  # Explicitly set port
+    ports:
+      - "3000:3000"  # Expose for debugging
+    depends_on:
+      - mongo
+
+  # Frontend service (serves static files)
+  studentportfolio:
+    build: ./studentportfolio
+
+    # Remove host port mapping since we'll access through Nginx
+    # ports:
+    #   - "3000:80"
+    # This should just serve static files, no Nginx config needed here
+
+    # Dedicated Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"  # Main entry point for all traffic
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./studentportfolio:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+      - studentportfolio
+      - transactions
+volumes:
+  mongo_data:
